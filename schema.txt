@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generated schema for Root",
+  "type": "object",
+  "properties": {
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "base64": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "contentType",
+                "base64"
+              ]
+            }
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "url"
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "payload"
+              ]
+            }
+          }
+        },
+        "required": [
+          "role",
+          "timestamp"
+        ]
+      }
+    },
+    "isTyping": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "messages",
+    "isTyping"
+  ]
+}
