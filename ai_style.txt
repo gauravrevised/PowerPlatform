@@ -1,0 +1,46 @@
+$"<div style='
+  width:{Self.Width}px;
+  height:{Self.Height-1}px;
+  font-family:Inter, Segoe UI, sans-serif;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+'>
+
+  <div style='display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#1B2430;'>
+    <span style='
+      width:20px; height:20px; min-width:20px;
+      border-radius:50%;
+      background:#EAF1FE;
+      color:#0F5FDC;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:800;
+    '>✓</span>
+    <span>Answers grounded in your actual course content, cited by module</span>
+  </div>
+
+  <div style='display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#1B2430;'>
+    <span style='
+      width:20px; height:20px; min-width:20px;
+      border-radius:50%;
+      background:#EAF1FE;
+      color:#0F5FDC;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:800;
+    '>✓</span>
+    <span>Picks up right where a lesson left off — no re-explaining context</span>
+  </div>
+
+  <div style='display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#1B2430;'>
+    <span style='
+      width:20px; height:20px; min-width:20px;
+      border-radius:50%;
+      background:#EAF1FE;
+      color:#0F5FDC;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:800;
+    '>✓</span>
+    <span>Generates practice scenarios when you want extra reps</span>
+  </div>
+
+</div>"
