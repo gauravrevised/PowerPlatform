@@ -64,6 +64,11 @@ xml
   <circle cx="116" cy="16" r="2.2" fill="#1B2430"><animate attributeName="opacity" values="0;1;0" dur="1.4s" begin="0.4s" repeatCount="indefinite"/></circle>
 </svg>
 
+updated
+<svg width="320" height="28" viewBox="0 0 320 28" xmlns="http://www.w3.org/2000/svg">
+  <text x="0" y="19" font-family="Segoe UI, Arial, sans-serif" font-size="16.5" font-weight="800" fill="#1B2430">Loading<tspan opacity="0">.<animate attributeName="opacity" values="0;1;0" dur="1.4s" begin="0s" repeatCount="indefinite"/></tspan><tspan opacity="0">.<animate attributeName="opacity" values="0;1;0" dur="1.4s" begin="0.2s" repeatCount="indefinite"/></tspan><tspan opacity="0">.<animate attributeName="opacity" values="0;1;0" dur="1.4s" begin="0.4s" repeatCount="indefinite"/></tspan></text>
+</svg>
+
 5 — Progress Bar (indeterminate slide)
 
 xml
