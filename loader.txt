@@ -1,0 +1,84 @@
+1️⃣ Spinner (SVG ring) — reusable across all states, just change the gradient colors
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; display:flex; align-items:center; justify-content:center;'>
+<style>
+  @keyframes lh_spin { to { transform: rotate(360deg); } }
+  .lh-ring { animation: lh_spin 1.1s linear infinite; transform-origin: center; }
+</style>
+<svg class='lh-ring' width='72' height='72' viewBox='0 0 96 96'>
+  <defs>
+    <linearGradient id='lhGrad' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0%' stop-color='#0F5FDC'/>
+      <stop offset='100%' stop-color='#00B2A9'/>
+    </linearGradient>
+  </defs>
+  <circle cx='48' cy='48' r='40' fill='none' stroke='#EAF1FE' stroke-width='8'/>
+  <circle cx='48' cy='48' r='40' fill='none' stroke='url(#lhGrad)' stroke-width='8' stroke-linecap='round' stroke-dasharray='180 251'/>
+</svg>
+</div>"
+
+Gradient swaps per state — use #0F5FDC → #00B2A9 (general), #0F5FDC → #8B5CF6 (quiz fetch), #00B2A9 → #0F5FDC (AI scoring).
+
+
+
+2️⃣ Icon (center of the ring) — position this control directly on top of the spinner
+
+General loading (grid icon):
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; display:flex; align-items:center; justify-content:center; color:#0F5FDC;'>
+<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><rect x='3' y='3' width='7' height='7' rx='1.5'/><rect x='14' y='3' width='7' height='7' rx='1.5'/><rect x='3' y='14' width='7' height='7' rx='1.5'/><rect x='14' y='14' width='7' height='7' rx='1.5'/></svg>
+</div>"
+
+Fetching quiz (checklist icon):
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; display:flex; align-items:center; justify-content:center; color:#0F5FDC;'>
+<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>
+</div>"
+
+Assessing score / AI (spark icon):
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; display:flex; align-items:center; justify-content:center; color:#00B2A9;'>
+<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M13 2 3 14h7l-1 8 10-12h-7l1-8z'/></svg>
+</div>"
+
+
+
+3️⃣ Text (title + animated dots + subtext) — swap the two text strings per state
+
+General loading:
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; text-align:center; font-family:Inter,Segoe UI,sans-serif;'>
+<style>
+  @keyframes lh_dot { 0%{opacity:0;} 30%{opacity:1;} 60%{opacity:0;} 100%{opacity:0;} }
+  .lh-dots span{opacity:0; animation:lh_dot 1.4s infinite;}
+  .lh-dots span:nth-child(2){animation-delay:.2s;}
+  .lh-dots span:nth-child(3){animation-delay:.4s;}
+</style>
+<div style='font-size:16.5px; font-weight:800; color:#1B2430;'>Loading<span class='lh-dots'><span>.</span><span>.</span><span>.</span></span></div>
+<div style='font-size:13px; color:#7A8699; margin-top:6px;'>Getting things ready for you.</div>
+</div>"
+
+Fetching personalized quiz:
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; text-align:center; font-family:Inter,Segoe UI,sans-serif;'>
+<style>
+  @keyframes lh_dot { 0%{opacity:0;} 30%{opacity:1;} 60%{opacity:0;} 100%{opacity:0;} }
+  .lh-dots span{opacity:0; animation:lh_dot 1.4s infinite;}
+  .lh-dots span:nth-child(2){animation-delay:.2s;}
+  .lh-dots span:nth-child(3){animation-delay:.4s;}
+</style>
+<div style='font-size:16.5px; font-weight:800; color:#1B2430;'>Fetching your personalized quiz<span class='lh-dots'><span>.</span><span>.</span><span>.</span></span></div>
+<div style='font-size:13px; color:#7A8699; margin-top:6px;'>Selecting questions based on your learning path and skill level.</div>
+</div>"
+
+Assessing score / generating recommendations:
+
+$"<div style='width:{Self.Width}px; height:{Self.Height-1}px; text-align:center; font-family:Inter,Segoe UI,sans-serif;'>
+<style>
+  @keyframes lh_dot { 0%{opacity:0;} 30%{opacity:1;} 60%{opacity:0;} 100%{opacity:0;} }
+  .lh-dots span{opacity:0; animation:lh_dot 1.4s infinite;}
+  .lh-dots span:nth-child(2){animation-delay:.2s;}
+  .lh-dots span:nth-child(3){animation-delay:.4s;}
+</style>
+<div style='font-size:16.5px; font-weight:800; color:#1B2430;'>Assessing your score<span class='lh-dots'><span>.</span><span>.</span><span>.</span></span></div>
+<div style='font-size:13px; color:#7A8699; margin-top:6px;'>Our AI agent is analyzing your responses to generate personalized course recommendations.</div>
+</div>"
