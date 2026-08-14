@@ -1,0 +1,45 @@
+$"<div style='
+  width:{Self.Width}px;
+  height:{Self.Height-1}px;
+  font-family:Segoe UI, Arial, sans-serif;
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF1FE 240px);
+  border:1px solid #E2E6EC;
+  border-radius:14px;
+  overflow:auto;
+  box-sizing:border-box;
+'>
+
+<div style='padding:22px 24px 4px; display:flex; align-items:center; gap:11px;'>
+  <div style='width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0F5FDC,#00B2A9);display:flex;align-items:center;justify-content:center;flex-shrink:0;'>
+    <svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'><path d='M13 2 3 14h7l-1 8 10-12h-7l1-8z'/></svg>
+  </div>
+  <div>
+    <div style='font-size:14px;font-weight:800;color:#1B2430;'>AI Agent — Personalized Recommendation</div>
+    <div style='font-size:11px;color:#7A8699;display:flex;align-items:center;gap:6px;'>
+      <span style='width:7px;height:7px;background:#22C55E;border-radius:50%;display:inline-block;'></span>
+      Generated from your score just now
+    </div>
+  </div>
+</div>
+
+<div style='padding:16px 24px 8px;'>
+  <div style='font-size:13px; line-height:1.68; color:#1B2430; background:#fff; border:1px solid #E2E6EC; border-radius:14px; border-top-left-radius:4px; padding:15px 17px;'>
+    {varDescription}
+  </div>
+</div>
+
+<div style='padding:6px 24px 24px; display:grid; grid-template-columns:1fr 1fr; gap:13px;'>
+{Concat(
+    colRecommendedCourses,
+    $"<div style='background:#fff; border:1px solid #E2E6EC; border-radius:13px; padding:16px;'>
+        <div style='width:32px;height:32px;border-radius:9px;background:#EAF1FE;color:#0F5FDC;display:flex;align-items:center;justify-content:center;margin-bottom:10px;'>
+          <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 3v18M15 3v18M3 9h18M3 15h18'/></svg>
+        </div>
+        <div style='font-size:13px;font-weight:700;color:#1B2430;margin-bottom:4px;'>{courseName}</div>
+        <div style='font-size:11.5px;color:#7A8699;line-height:1.5;margin-bottom:10px;'>{courseDetail}</div>
+        <a href='{courseUrl}' target='_blank' style='font-size:12px;font-weight:700;color:#0F5FDC;text-decoration:none;'>Start module →</a>
+      </div>"
+)}
+</div>
+
+</div>"
