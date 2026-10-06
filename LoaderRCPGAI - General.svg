@@ -1,0 +1,230 @@
+<svg
+  width="100%"
+  height="100%"
+  viewBox="0 0 690 330"
+  preserveAspectRatio="xMidYMid meet"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label="Loading workspace"
+>
+  <defs>
+
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="logoGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <linearGradient id="innerRing" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34d9ff" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#4285f4" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#a8c7fa" stop-opacity="0.08"/>
+    </linearGradient>
+
+    <linearGradient id="outerRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4285f4" stop-opacity="0.05"/>
+      <stop offset="40%" stop-color="#4285f4" stop-opacity="0.7"/>
+      <stop offset="70%" stop-color="#8ab4f8" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#4285f4" stop-opacity="0.05"/>
+    </linearGradient>
+
+  </defs>
+
+  <!-- Background -->
+  <rect
+    width="680"
+    height="320"
+    x="5"
+    y="5"
+    rx="16"
+    fill="#1b1c1d"
+  />
+
+  <!-- Outer breathing ring -->
+  <circle
+    cx="340"
+    cy="140"
+    r="40"
+    fill="none"
+    stroke="#a8c7fa"
+    stroke-width="2"
+    opacity="0.09"
+  >
+    <animate
+      attributeName="r"
+      values="40;43;40"
+      dur="2.8s"
+      repeatCount="indefinite"
+    />
+    <animate
+      attributeName="opacity"
+      values="0.09;0.025;0.09"
+      dur="2.8s"
+      repeatCount="indefinite"
+    />
+  </circle>
+
+  <!-- Animated inner ring -->
+  <circle
+    cx="340"
+    cy="140"
+    r="30"
+    fill="none"
+    stroke="url(#innerRing)"
+    stroke-width="2"
+    opacity="0.2"
+  >
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      from="0 340 140"
+      to="360 340 140"
+      dur="6s"
+      repeatCount="indefinite"
+    />
+
+    <animate
+      attributeName="r"
+      values="30;32;30"
+      dur="2.4s"
+      repeatCount="indefinite"
+    />
+  </circle>
+<!-- Orbiting dot 1 -->
+<circle
+  cx="340"
+  cy="110"
+  r="2.5"
+  fill="#8b5cf6"
+  filter="url(#glow)"
+>
+  <animateTransform
+    attributeName="transform"
+    type="rotate"
+    from="0 340 140"
+    to="360 340 140"
+    dur="3.5s"
+    repeatCount="indefinite"
+  />
+</circle>
+
+<!-- Orbiting dot 2 -->
+<circle
+  cx="340"
+  cy="110"
+  r="2"
+  fill="#ec4899"
+  filter="url(#glow)"
+>
+  <animateTransform
+    attributeName="transform"
+    type="rotate"
+    from="180 340 140"
+    to="540 340 140"
+    dur="3.5s"
+    repeatCount="indefinite"
+  />
+</circle>
+  <!-- ========================================================= -->
+  <!-- EXACT BRANDMARK - ORIGINAL 64x64 VIEWBOX                 -->
+  <!-- ========================================================= -->
+
+
+
+
+
+  <!-- Title -->
+
+
+  <!-- Subtitle -->
+  <text
+    x="340"
+    y="220"
+    text-anchor="middle"
+    fill="#9aa0a6"
+    font-family="Segoe UI Variable, Segoe UI, sans-serif"
+    font-size="12"
+  >
+    Loading…
+  </text>
+
+
+  <!-- Loading dots -->
+
+  <circle
+    cx="328"
+    cy="250"
+    r="3.5"
+    fill="#a8c7fa"
+  >
+    <animate
+      attributeName="opacity"
+      values="0.2;1;0.2"
+      dur="1.2s"
+      begin="0s"
+      repeatCount="indefinite"
+    />
+    <animate
+      attributeName="r"
+      values="3;4;3"
+      dur="1.2s"
+      begin="0s"
+      repeatCount="indefinite"
+    />
+  </circle>
+
+  <circle
+    cx="340"
+    cy="250"
+    r="3.5"
+    fill="#a8c7fa"
+  >
+    <animate
+      attributeName="opacity"
+      values="0.2;1;0.2"
+      dur="1.2s"
+      begin="0.2s"
+      repeatCount="indefinite"
+    />
+    <animate
+      attributeName="r"
+      values="3;4;3"
+      dur="1.2s"
+      begin="0.2s"
+      repeatCount="indefinite"
+    />
+  </circle>
+
+  <circle
+    cx="352"
+    cy="250"
+    r="3.5"
+    fill="#a8c7fa"
+  >
+    <animate
+      attributeName="opacity"
+      values="0.2;1;0.2"
+      dur="1.2s"
+      begin="0.4s"
+      repeatCount="indefinite"
+    />
+    <animate
+      attributeName="r"
+      values="3;4;3"
+      dur="1.2s"
+      begin="0.4s"
+      repeatCount="indefinite"
+    />
+  </circle>
+
+</svg>
