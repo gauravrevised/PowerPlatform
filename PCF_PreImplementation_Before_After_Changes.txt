@@ -1,0 +1,2216 @@
+PCF PRE-IMPLEMENTATION GAP FIXES - BEFORE / AFTER
+Date: 13 October 2026
+
+WORKSPACE ROOT
+C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent
+
+This file is a change plan, not a claim that the PCF or flows have been updated.
+Only this change document is delivered. Source files and the earlier implementation
+guide are unchanged. Apply numbered edits in order; each BEFORE block was checked
+against the source after preceding edits. Line numbers are orientation only; use
+the exact BEFORE block as the replacement anchor. AFTER blocks are complete for
+their stated replacement. An added property must also be bound in Canvas.
+
+Scope: make the original two-flow Home + ShelfWorkspace recipe consistent and
+reliable for its stated synchronous workload. The additional flow/schema steps
+at the end are essential: editing TypeScript does not create Dataverse tables,
+configure content extraction, give Copilot access to files, or authorize users.
+Admin/Observability/export were disabled in the earlier recipe and are not silently
+implemented here. Keep them disabled until their separate backends are built.
+
+MAIN GAPS
+- Local state survives a workspace switch and is lost on a narrow-layout tab switch.
+- A command can disappear between updateView and the React effect that uses it.
+- An overlay does not itself stop keyboard/microphone interaction.
+- Sending without sources clears the draft before the host rejects it.
+- Duplicate filenames resolve citations ambiguously; unresolved events can double.
+- Quiz state carries between quizzes; final answer emits two last-event outputs.
+- File reads can overlap, return null, exceed remaining slots, or continue after close.
+- Add-source copy describes flagging that the code never enforces.
+- File/text validation, extracted content, browser links and settings persistence
+  must be completed in the flows rather than inferred from the workbook.
+- Startup and the flow snapshot contract need matching host changes.
+- The existing solution-build helper must isolate sibling manifests.
+
+APPLY ORDER
+1. PCF code / manifest changes below.
+2. Regenerate types and build the solution (instructions at the end).
+3. Import updated controls; add the new input bindings and formula edits.
+4. Complete both flows, response validation, table mappings and content retrieval.
+5. Run the acceptance scenarios before publishing.
+
+All local source paths below are relative to WORKSPACE ROOT unless marked full.
+Power Apps formulas live in Canvas Studio properties, not in a .tsx file. The
+guide path identifies the copy/paste source; the control/property is the real target.
+Power Automate and Dataverse edits have portal locations, not invented local files.
+
+CHANGE 01
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\ControlManifest.Input.xml
+LOCATION: around line 10 after earlier edits; find the BEFORE block.
+WHY: Add two inputs before the sources properties. Workspace identity must reset local React state; a pointer overlay alone does not block keyboard interaction.
+
+BEFORE
+------
+    <!-- sources -->
+
+AFTER
+-----
+    <!-- Host identity and interaction lock. Bind both in Canvas. -->
+    <property name="WorkspaceKey" display-name-key="Workspace Key"
+              description-key="Current Dataverse workspace GUID, or home when no workspace is open."
+              of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="HostBusy" display-name-key="Host Busy"
+              description-key="Blocks interaction while the host processes a request."
+              of-type="TwoOptions" usage="input" required="false" />
+
+    <!-- sources -->
+
+CHANGE 02
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 58 after earlier edits; find the BEFORE block.
+WHY: Add host state next to the existing selection-seeding field.
+
+BEFORE
+------
+    private seeded = false;
+
+AFTER
+-----
+    private seeded = false;
+    private workspaceKey = "";
+    private hostBusy = false;
+
+CHANGE 03
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 78 after earlier edits; find the BEFORE block.
+WHY: Reset internal state when switching workspaces. The inert attribute blocks keyboard and pointer interaction in supported current browsers; keep the host overlay too.
+
+BEFORE
+------
+        const p = context.parameters;
+
+AFTER
+-----
+        const p = context.parameters;
+        const workspaceKey = p.WorkspaceKey?.raw || "home";
+        if (workspaceKey !== this.workspaceKey) {
+            this.workspaceKey = workspaceKey;
+            this.seeded = false;
+            this.selectedIds = [];
+            this.draft = "";
+            this.command = undefined;
+            this.lastCommandId = "";
+        }
+        this.hostBusy = p.HostBusy?.raw === true;
+        this.host.toggleAttribute("inert", this.hostBusy);
+        this.host.setAttribute("aria-busy", String(this.hostBusy));
+
+CHANGE 04
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 112 after earlier edits; find the BEFORE block.
+WHY: Do not replace a newly queued React command with undefined during a second updateView before React commits. Also prune removed/flagged/duplicate source ids.
+
+BEFORE
+------
+        } else {
+            this.command = undefined;
+        }
+
+        const h
+
+AFTER
+-----
+        }
+        // Retain the same command object until a NEW command id arrives.
+        // React effects consume this stable object once per id/object change.
+        const selectable = new Set(sources.filter((s) => !s.flagged).map((s) => s.id));
+        this.selectedIds = Array.from(new Set(this.selectedIds))
+            .filter((id) => typeof id === "string" && selectable.has(id));
+
+        const h
+
+CHANGE 05
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 111 after earlier edits; find the BEFORE block.
+WHY: Keep DraftText output consistent with a host-restored draft.
+
+BEFORE
+------
+            if (cmd.action === "ClearDraft") this.draft = "";
+
+AFTER
+-----
+            if (cmd.action === "ClearDraft") this.draft = "";
+            if (cmd.action === "SetDraft") this.draft = String(cmd.payload?.text ?? "");
+
+CHANGE 06
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 181 after earlier edits; find the BEFORE block.
+WHY: A workspace-specific React key resets drafts, dialogs, local viewer and quiz state when the user changes notebooks.
+
+BEFORE
+------
+        this.root.render(React.createElement(Workspace, props));
+
+AFTER
+-----
+        this.root.render(React.createElement(Workspace, {
+            ...props,
+            key: workspaceKey,
+        }));
+
+CHANGE 07
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\index.ts
+LOCATION: around line 187 after earlier edits; find the BEFORE block.
+WHY: Do not emit user actions while a foreground flow is running. Backend authorization still applies.
+
+BEFORE
+------
+    private emit(panel: PanelKey, name: string, payload?: unknown): void {
+        this.eventPanel
+
+AFTER
+-----
+    private emit(panel: PanelKey, name: string, payload?: unknown): void {
+        if (this.hostBusy) return;
+        this.eventPanel
+
+CHANGE 08
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 72 after earlier edits; find the BEFORE block.
+WHY: Fix the SVG data URI separator; the current workspace logo URI is malformed.
+
+BEFORE
+------
+data:image/svg+xml:charset=utf-8,
+
+AFTER
+-----
+data:image/svg+xml;charset=utf-8,
+
+CHANGE 09
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 143 after earlier edits; find the BEFORE block.
+WHY: Allow the existing selection command to explicitly release a locally opened viewer after applying a host snapshot. This replaces the whitespace workaround in the original guide.
+
+BEFORE
+------
+            case "CloseViewer":
+                setLocalViewer(null);
+                break;
+
+AFTER
+-----
+            case "CloseViewer":
+                setLocalViewer(null);
+                break;
+            case "SetSelection":
+                if (command.payload?.closeViewer === true) setLocalViewer(null);
+                break;
+
+CHANGE 10
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 174 after earlier edits; find the BEFORE block.
+WHY: Prevent ambiguous filename matches and remove the duplicate CitationUnresolved event followed immediately by CitationClicked.
+
+BEFORE
+------
+        const match = sources.find((s) => s.id === c.sourceId) ?? (
+            c.fileName
+                ? sources.find((s) =>
+                    (s.fileName ?? "").toLowerCase() === c.fileName!.toLowerCase() ||
+                    s.title.toLowerCase() === c.fileName!.toLowerCase()
+                )
+                : undefined
+        );
+
+        if (!match) {
+            onEvent("chat", "CitationUnresolved", {
+                messageId, sourceId: c.sourceId, fileName: c.fileName, index: c.index,
+            });
+            return false;
+        }
+
+
+
+AFTER
+-----
+        const byId = sources.find((s) => s.id === c.sourceId);
+        const fileName = (c.fileName ?? "").trim().toLowerCase();
+        const candidates = fileName
+            ? sources.filter((s) =>
+                (s.fileName ?? "").trim().toLowerCase() === fileName ||
+                s.title.trim().toLowerCase() === fileName)
+            : [];
+        const match = byId ?? (candidates.length === 1 ? candidates[0] : undefined);
+        // ChatPanel emits the single unresolved/fallback event.
+        // Never choose the first of several identically named files.
+        if (!match) return false;
+
+
+
+CHANGE 11
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 442 after earlier edits; find the BEFORE block.
+WHY: Normalize the path event to the casing used by standalone ShelfStudio. Keep the app alias for old deployed versions.
+
+BEFORE
+------
+onEvent("studio", "createPathRequested",{ role, level, goal});
+
+AFTER
+-----
+onEvent("studio", "CreatePathRequested", { role, level, goal });
+
+CHANGE 12
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 327 after earlier edits; find the BEFORE block.
+WHY: Keep ChatPanel mounted when a narrow-layout user changes tabs, preserving an unfinished draft or quiz.
+
+BEFORE
+------
+                {showChat ? (
+                    <div className="ws-col ws-mid">
+
+AFTER
+-----
+                <div className="ws-col ws-mid" style={{ display: showChat ? undefined : "none" }}>
+
+CHANGE 13
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 329 after earlier edits; find the BEFORE block.
+WHY: Tell ChatPanel when it is hidden so microphone capture can stop.
+
+BEFORE
+------
+                            messages={messages}
+                            notebook={notebook}
+
+AFTER
+-----
+                            active={showChat}
+                            messages={messages}
+                            notebook={notebook}
+
+CHANGE 14
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/Workspace.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\Workspace.tsx
+LOCATION: around line 355 after earlier edits; find the BEFORE block.
+WHY: Remove the matching conditional close for the now-persistent chat panel.
+
+BEFORE
+------
+                    </div>
+                ) : null}
+
+                {!narrow || tab === "sources" ? (
+
+AFTER
+-----
+                </div>
+
+                {!narrow || tab === "sources" ? (
+
+CHANGE 15
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 14 after earlier edits; find the BEFORE block.
+WHY: Optional active property keeps standalone ShelfChat compatible.
+
+BEFORE
+------
+export interface ChatPanelProps {
+  messages
+
+AFTER
+-----
+export interface ChatPanelProps {
+  active?: boolean;
+  messages
+
+CHANGE 16
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 36 after earlier edits; find the BEFORE block.
+WHY: Read the active state with a compatible default.
+
+BEFORE
+------
+    messages, notebook, suggested, viewer, streamingText, isThinking,
+    selectedCount
+
+AFTER
+-----
+    active = true, messages, notebook, suggested, viewer, streamingText, isThinking,
+    selectedCount
+
+CHANGE 17
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 42 after earlier edits; find the BEFORE block.
+WHY: Block a second immediate send before the host renders IsThinking, and stop microphone capture when hidden, viewing an artifact, waiting, or unmounted.
+
+BEFORE
+------
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+AFTER
+-----
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const sendPending = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!isThinking) sendPending.current = false;
+  }, [isThinking]);
+
+  React.useEffect(() => {
+    if (!active || viewer || isThinking) SpeechRecognition.abortListening();
+  }, [active, viewer, isThinking]);
+
+  React.useEffect(() => () => { SpeechRecognition.abortListening(); }, []);
+
+CHANGE 18
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 104 after earlier edits; find the BEFORE block.
+WHY: Successful snapshot or failed-send draft restoration releases the immediate-send guard.
+
+BEFORE
+------
+    if (command.action === "SetDraft") {
+
+AFTER
+-----
+    if (command.action === "SetSelection") sendPending.current = false;
+    if (command.action === "SetDraft") {
+      sendPending.current = false;
+
+CHANGE 19
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 95 after earlier edits; find the BEFORE block.
+WHY: Allow standalone hosts using ClearDraft to release the send guard too.
+
+BEFORE
+------
+    if (command.action === "ClearDraft") {
+      setDraft("");
+
+AFTER
+-----
+    if (command.action === "ClearDraft") {
+      sendPending.current = false;
+      setDraft("");
+
+CHANGE 20
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 116 after earlier edits; find the BEFORE block.
+WHY: Preserve the draft when no source is selected; previously the app rejected the question after the PCF had already erased it.
+
+BEFORE
+------
+    if (!q || isThinking) return;
+    onEvent("AskQuestion", { text: q, origin, fromMessageId });
+
+AFTER
+-----
+    if (!q || !active || isThinking || selectedCount < 1 || sendPending.current) return;
+    sendPending.current = true;
+    SpeechRecognition.abortListening();
+    resetTranscript();
+    onEvent("AskQuestion", { text: q, origin, fromMessageId });
+
+CHANGE 21
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 245 after earlier edits; find the BEFORE block.
+WHY: Keep send-button availability aligned with the ask() guard. Suggested/follow-up sends use the same guard.
+
+BEFORE
+------
+              disabled={!draft.trim() || isThinking}
+
+AFTER
+-----
+              disabled={!draft.trim() || isThinking || !active || selectedCount < 1}
+
+CHANGE 22
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ChatPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ChatPanel.tsx
+LOCATION: around line 236 after earlier edits; find the BEFORE block.
+WHY: Disable microphone initiation while the panel is inactive or waiting.
+
+BEFORE
+------
+                  onClick={toggleSpeech}
+
+AFTER
+-----
+                  disabled={!active || isThinking}
+                  onClick={toggleSpeech}
+
+CHANGE 23
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/Viewer.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\Viewer.tsx
+LOCATION: around line 6 after earlier edits; find the BEFORE block.
+WHY: Use the existing ID helper for a stable quiz attempt identity.
+
+BEFORE
+------
+import { ViewerPayload } from "../shared/types";
+
+AFTER
+-----
+import { ViewerPayload, newId } from "../shared/types";
+
+CHANGE 24
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/Viewer.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\Viewer.tsx
+LOCATION: around line 46 after earlier edits; find the BEFORE block.
+WHY: Reset React quiz state when a different quiz or revised quiz content opens, including regeneration under the same output id. Return stable field/array order for unchanged quiz data so an ordinary save response preserves the current attempt.
+
+BEFORE
+------
+{payload.type === "quiz" ? <QuizView payload={payload} onEvent={onEvent} /> : null}
+
+AFTER
+-----
+{payload.type === "quiz" ? <QuizView key={JSON.stringify(payload.data)} payload={payload} onEvent={onEvent} /> : null}
+
+CHANGE 25
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/Viewer.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\Viewer.tsx
+LOCATION: around line 132 after earlier edits; find the BEFORE block.
+WHY: Replace the quiz state/choose block. Synchronous refs prevent stale double clicks; one completion event includes every answer for server-side scoring and optional rcpg_quizanswer persistence.
+
+BEFORE
+------
+    const questions = payload.data.questions;
+    const passMark = payload.data.passMark ?? 70;
+    const [picked, setPicked] = React.useState<Record<string, number>>({});
+    const [startedAt] = React.useState(() => Date.now());
+    const answered = Object.keys(picked).length;
+    const correct = questions.reduce(
+        (n, q) => n + (picked[q.id] === q.answerIndex ? 1 : 0), 0);
+
+    const choose = (qIndex: number, optIndex: number) => {
+        const q = questions[qIndex];
+        if (picked[q.id] !== undefined) return;
+
+        const next = { ...picked, [q.id]: optIndex };
+        setPicked(next);
+
+        onEvent("QuizAnswered", {
+            quizId: payload.data.id,
+            questionId: q.id,
+            selectedIndex: optIndex,
+            correct: optIndex === q.answerIndex,
+            answeredAt: new Date().toISOString(),
+        });
+
+        if (Object.keys(next).length === questions.length) {
+            const score = Math.round(
+                (questions.reduce((n, qq) => n + (next[qq.id] === qq.answerIndex ? 1 : 0), 0) / questions.length) * 100
+            );
+            onEvent("QuizCompleted", {
+                quizId: payload.data.id,
+                total: questions.length,
+                correct: questions.reduce((n, qq) => n + (next[qq.id] === qq.answerIndex ? 1 : 0), 0),
+                score,
+                passed: score >= passMark,
+                durationSeconds: Math.round((Date.now() - startedAt) / 1000),
+            });
+        }
+    };
+
+
+
+AFTER
+-----
+    const questions = payload.data.questions;
+    const passMark = payload.data.passMark ?? 70;
+    const [picked, setPicked] = React.useState<Record<string, number>>({});
+    const pickedRef = React.useRef<Record<string, number>>({});
+    const answeredAtRef = React.useRef<Record<string, string>>({});
+    const completedRef = React.useRef(false);
+    const [attemptId] = React.useState(() => newId());
+    const [startedAt] = React.useState(() => Date.now());
+    const answered = Object.keys(picked).length;
+    const correct = questions.reduce(
+        (n, q) => n + (picked[q.id] === q.answerIndex ? 1 : 0), 0);
+
+    const choose = (qIndex: number, optIndex: number) => {
+        const q = questions[qIndex];
+        if (!q || completedRef.current || pickedRef.current[q.id] !== undefined ||
+            optIndex < 0 || optIndex >= q.options.length) return;
+        const next = { ...pickedRef.current, [q.id]: optIndex };
+        pickedRef.current = next;
+        answeredAtRef.current[q.id] = new Date().toISOString();
+        setPicked(next);
+
+        // One completion event contains ALL answers; no lossy final-event pair.
+        if (Object.keys(next).length !== questions.length) return;
+        completedRef.current = true;
+        const correctCount = questions.reduce(
+            (n, question) => n + (next[question.id] === question.answerIndex ? 1 : 0), 0);
+        const score = Math.round(correctCount / questions.length * 100);
+        onEvent("QuizCompleted", {
+            attemptId,
+            quizId: payload.data.id,
+            total: questions.length,
+            correct: correctCount,
+            score,
+            passMark,
+            passed: score >= passMark,
+            durationSeconds: Math.round((Date.now() - startedAt) / 1000),
+            answers: questions.map((question) => ({
+                questionId: question.id,
+                selectedIndex: next[question.id],
+                answeredAt: answeredAtRef.current[question.id],
+            })),
+        });
+    };
+
+
+
+CHANGE 26
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/Viewer.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\Viewer.tsx
+LOCATION: around line 81 after earlier edits; find the BEFORE block.
+WHY: Do not show an active download button when the flow supplied no browser-accessible link.
+
+BEFORE
+------
+                <button className="pillbtn fill"
+                        onClick={() => onEvent("DownloadSource", { id: d.id, downloadUrl: d.downloadUrl })}>
+
+AFTER
+-----
+                <button className="pillbtn fill"
+                        disabled={!d.downloadUrl}
+                        title={d.downloadUrl ? "Download source" : "No download link is available"}
+                        onClick={() => onEvent("DownloadSource", { id: d.id, downloadUrl: d.downloadUrl })}>
+
+CHANGE 27
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 94 after earlier edits; find the BEFORE block.
+WHY: Do not allow a flagged source to become selected through an individual checkbox.
+
+BEFORE
+------
+    const next = new Set(sel);
+    if (next.has(id))
+
+AFTER
+-----
+    if (sources.find((s) => s.id === id)?.flagged) return;
+    const next = new Set(sel);
+    if (next.has(id))
+
+CHANGE 28
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 100 after earlier edits; find the BEFORE block.
+WHY: Select-all must use the same eligibility rule as individual selection.
+
+BEFORE
+------
+  const allOn = sources.length > 0 && sel.size === sources.length;
+  const toggleAll = () => onSelectionChange(allOn ? [] : sources.map((s) => s.id));
+
+AFTER
+-----
+  const selectable = sources.filter((s) => !s.flagged);
+  const allOn = selectable.length > 0 && selectable.every((s) => sel.has(s.id));
+  const toggleAll = () => onSelectionChange(allOn ? [] : selectable.map((s) => s.id));
+
+CHANGE 29
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 116 after earlier edits; find the BEFORE block.
+WHY: Reflect source eligibility in the checkbox control.
+
+BEFORE
+------
+<button onClick={() => toggle(item.id)} aria-label={"Select " + item.title} className="plain">
+
+AFTER
+-----
+<button onClick={() => toggle(item.id)} disabled={item.flagged === true} aria-label={"Select " + item.title} className="plain">
+
+CHANGE 30
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 293 after earlier edits; find the BEFORE block.
+WHY: Replace readFile and takeFiles in AddDialog. Check slots, nonempty bytes, extension, total batch, concurrent reads and unmounts. Preserve raw base64. Mirror 3 MiB and extension policy in FLOW_VALIDATE; accept only formats your extractor actually supports.
+
+BEFORE
+------
+  const readFile = (f: File) =>
+    new Promise<string | null>((resolve) => {
+      if (f.size > maxInlineFileBytes) { resolve(null); return; }
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1] ?? null);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(f);
+    });
+
+  // replace takeFiles
+  const takeFiles = async (list: FileList | null) => {
+      if (!list || list.length === 0) return;
+      const mb = (maxInlineFileBytes / 1024 / 1024).toFixed(0);
+      const oversized = Array.from(list).filter(f => f.size > maxInlineFileBytes);
+      if (oversized.length > 0) {
+          setFileError(`${oversized.map(f => f.name).join(", ")} exceed${oversized.length === 1 ? "s" : ""} the ${mb} MB limit and cannot be uploaded.`);
+          return;
+      }
+      setFileError(null);
+      const files = await Promise.all(
+          Array.from(list).map(async (f) => ({
+              name: f.name, size: f.size, mimeType: f.type,
+              contentBase64: await readFile(f),
+              tooLarge: false,
+          })),
+      );
+      onEvent("AddFileRequested", { files });
+      onClose();
+  };
+
+
+
+AFTER
+-----
+  const [reading, setReading] = React.useState(false);
+  const readingRef = React.useRef(false);
+  const liveRef = React.useRef(true);
+  const MAX_BATCH_BYTES = 3 * 1024 * 1024;
+  const ALLOWED = /\.(pdf|docx|txt|md|csv)$/i;
+  React.useEffect(() => {
+    liveRef.current = true;
+    return () => { liveRef.current = false; };
+  }, []);
+
+  const close = () => { if (!readingRef.current) onClose(); };
+  const readFile = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const comma = result.indexOf(",");
+      if (comma < 0 || !result.slice(comma + 1)) {
+        reject(new Error(`Could not read ${file.name}.`));
+      } else resolve(result.slice(comma + 1));
+    };
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+    reader.onabort = () => reject(new Error(`Reading ${file.name} was cancelled.`));
+    reader.readAsDataURL(file);
+  });
+
+  const takeFiles = async (list: FileList | null) => {
+    if (!list?.length || readingRef.current) return;
+    const selected = Array.from(list);
+    if (selected.length > Math.max(0, limit - count)) {
+      setFileError(`Only ${Math.max(0, limit - count)} source slots remain.`);
+      return;
+    }
+    if (selected.some((file) => !ALLOWED.test(file.name))) {
+      setFileError("Supported files: PDF, DOCX, TXT, MD and CSV.");
+      return;
+    }
+    if (selected.some((file) => file.size <= 0 || file.size > maxInlineFileBytes)) {
+      setFileError(`Every file must contain data and be at most ${(maxInlineFileBytes / 1048576).toFixed(1)} MiB.`);
+      return;
+    }
+    if (selected.reduce((total, file) => total + file.size, 0) > MAX_BATCH_BYTES) {
+      setFileError("Select at most 3 MiB of files per request.");
+      return;
+    }
+    readingRef.current = true;
+    setReading(true);
+    setFileError(null);
+    try {
+      const files = await Promise.all(selected.map(async (file) => ({
+        name: file.name, size: file.size, mimeType: file.type,
+        contentBase64: await readFile(file), tooLarge: false,
+      })));
+      if (!liveRef.current) return;
+      onEvent("AddFileRequested", { files });
+      onClose();
+    } catch (error) {
+      if (liveRef.current) setFileError(error instanceof Error ? error.message : "File reading failed.");
+    } finally {
+      readingRef.current = false;
+      if (liveRef.current) setReading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+
+
+CHANGE 31
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 358 after earlier edits; find the BEFORE block.
+WHY: Do not dismiss a dialog while files are being read.
+
+BEFORE
+------
+    <div className="scrim" onClick={onClose}>
+
+AFTER
+-----
+    <div className="scrim" onClick={close}>
+
+CHANGE 32
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 365 after earlier edits; find the BEFORE block.
+WHY: Disable close during a read.
+
+BEFORE
+------
+<button className="iconbtn" onClick={onClose} aria-label="Close">
+
+AFTER
+-----
+<button className="iconbtn" disabled={reading} onClick={close} aria-label="Close">
+
+CHANGE 33
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 383 after earlier edits; find the BEFORE block.
+WHY: Disable a second file chooser during a read.
+
+BEFORE
+------
+<button className="pillbtn fill mt14" onClick={() => fileRef.current?.click()}>
+
+AFTER
+-----
+<button className="pillbtn fill mt14" disabled={reading} onClick={() => fileRef.current?.click()}>
+
+CHANGE 34
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 386 after earlier edits; find the BEFORE block.
+WHY: Filter the chooser; backend still checks content. Add/drop use the same takeFiles validator.
+
+BEFORE
+------
+<input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => void takeFiles(e.target.files)} />
+
+AFTER
+-----
+<input ref={fileRef} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv" disabled={reading} className="hidden" onChange={(e) => void takeFiles(e.target.files)} />
+
+CHANGE 35
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 394 after earlier edits; find the BEFORE block.
+WHY: Prevent switching source mode during a read.
+
+BEFORE
+------
+<button className="optcard" onClick={() => setMode("link")}>
+
+AFTER
+-----
+<button className="optcard" disabled={reading} onClick={() => setMode("link")}>
+
+CHANGE 36
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 399 after earlier edits; find the BEFORE block.
+WHY: Prevent switching source mode during a read.
+
+BEFORE
+------
+<button className="optcard" onClick={() => setMode("text")}>
+
+AFTER
+-----
+<button className="optcard" disabled={reading} onClick={() => setMode("text")}>
+
+CHANGE 37
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 414 after earlier edits; find the BEFORE block.
+WHY: Fix UI copy that contradicted the proposed flow and code: the original code did not itself flag or exclude anything.
+
+BEFORE
+------
+Uploads are checked against the retail and CPG domain. Anything outside it is added but flagged and left unselected, so it never grounds an answer.
+
+AFTER
+-----
+Sources are validated before they are added. Rejected or unreadable content is not available to the agent.
+
+CHANGE 38
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 456 after earlier edits; find the BEFORE block.
+WHY: Require HTTPS and an available slot before emitting a link; server performs full URL/authentication/content validation.
+
+BEFORE
+------
+                disabled={!url.trim()}
+
+AFTER
+-----
+                disabled={reading || count >= limit || !/^https:\/\//i.test(url.trim())}
+
+CHANGE 39
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/SourcesPanel.tsx
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\SourcesPanel.tsx
+LOCATION: around line 465 after earlier edits; find the BEFORE block.
+WHY: Enforce the selected text-size policy and source slots on the client too; the flow must match 50000 characters.
+
+BEFORE
+------
+                disabled={!body.trim() || !title.trim()}
+
+AFTER
+-----
+                disabled={reading || count >= limit || !body.trim() || body.length > 50000 || !title.trim()}
+
+CHANGE 40
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\index.ts
+LOCATION: around line 53 after earlier edits; find the BEFORE block.
+WHY: Shared panels consume a command in a React effect. Keep it stable across intermediate host updates in this standalone control too.
+
+BEFORE
+------
+        } else {
+            this.command = undefined;
+        }
+
+AFTER
+-----
+        }
+        // Keep the command stable until the host sends a new id.
+
+CHANGE 41
+========================================================================
+FILE: ShelfDomainAgent/ShelfStudio/index.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfStudio\index.ts
+LOCATION: around line 61 after earlier edits; find the BEFORE block.
+WHY: Shared panels consume a command in a React effect. Keep it stable across intermediate host updates in this standalone control too.
+
+BEFORE
+------
+        } else {
+            this.command = undefined;
+        }
+
+AFTER
+-----
+        }
+        // Keep the command stable until the host sends a new id.
+
+CHANGE 42
+========================================================================
+FILE: ShelfDomainAgent/shared/types.ts
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\shared\types.ts
+LOCATION: around line 194 after earlier edits; find the BEFORE block.
+WHY: Reject obvious object/array envelope mismatches instead of crashing on .map(). This is NOT a deep schema validator; the flow response schema below must validate item fields and viewer payloads.
+
+BEFORE
+------
+    const v = JSON.parse(raw) as T;
+    return v === null || v === undefined ? fallback : v;
+
+AFTER
+-----
+    const value: unknown = JSON.parse(raw);
+    if (value === null || value === undefined) return fallback;
+    if (Array.isArray(fallback) && !Array.isArray(value)) return fallback;
+    if (fallback !== null && typeof fallback === "object" && !Array.isArray(fallback) &&
+        (typeof value !== "object" || Array.isArray(value))) return fallback;
+    return value as T;
+
+CHANGE 43
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 337 after earlier edits; find the BEFORE block.
+WHY: Power Apps: add these workspacePCF input bindings after importing the revised manifest. HostBusy is independent of IsThinking.
+
+BEFORE
+------
+  SourcesJson              varSourcesJson
+
+AFTER
+-----
+  WorkspaceKey             If(varView="workspace",varWorkspaceId,"home")
+  HostBusy                 varBusy
+  SourcesJson              varSourcesJson
+
+CHANGE 44
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 256 after earlier edits; find the BEFORE block.
+WHY: Power Apps: initialize a boot timer without starting it yet. Screen.OnVisible can run before nonblocking App.OnStart has finished.
+
+BEFORE
+------
+Set(varInitialized, false);
+
+AFTER
+-----
+Set(varInitialized, false);
+Set(varInitTimer, false);
+
+CHANGE 45
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 300 after earlier edits; find the BEFORE block.
+WHY: Replace scrMain.OnVisible startup with a timer triggered only after App.OnStart finishes. See the final App.OnStart ordering in the follow-up edit.
+
+BEFORE
+------
+scrMain.OnVisible:
+
+If(!varInitialized && !varBusy,
+    Set(varBusy,true);
+    Set(varTargetFlow,"chat");
+    Set(varOperation,"Initialize");
+    Set(varPanel,"home");
+    Set(varPayloadJson,"{}");
+    Select(btnRunRequest)
+)
+
+
+
+AFTER
+-----
+scrMain.OnVisible:
+
+false
+
+ADD a Timer on scrMain named tmrInitialize (no corresponding local source file):
+  Duration = 100
+  Start = varInitTimer
+  Repeat = true
+  AutoStart = false
+  Visible = false
+
+tmrInitialize.OnTimerEnd:
+
+If(varInitTimer && !varInitialized && !varBusy,
+    Set(varInitTimer,false);
+    Set(varBusy,true);
+    Set(varTargetFlow,"chat");
+    Set(varOperation,"Initialize");
+    Set(varPanel,"home");
+    Set(varPayloadJson,"{}");
+    Select(btnRunRequest)
+)
+
+Set(varInitTimer,true) must be the LAST statement in App.OnStart, after all other
+initialization. The next edit adds it at that exact location.
+The timer makes only one initialization attempt; btnReload handles failures.
+
+
+
+CHANGE 46
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 298 after earlier edits; find the BEFORE block.
+WHY: Last App.OnStart statement: release the initialization timer after every required variable is set.
+
+BEFORE
+------
+Set(varPathDefaultsJson, JSON({roles:["Category manager","Analyst"],levels:["New to the field","Experienced"]}, JSONFormat.FlattenValueTables));
+
+AFTER
+-----
+Set(varPathDefaultsJson, JSON({roles:["Category manager","Analyst"],levels:["New to the field","Experienced"]}, JSONFormat.FlattenValueTables));
+Set(varInitTimer,true)
+
+CHANGE 47
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 647 after earlier edits; find the BEFORE block.
+WHY: Power Apps btnRunRequest.OnSelect: remove viewer whitespace toggling now that SetSelection can explicitly clear the local viewer.
+
+BEFORE
+------
+    Set(varViewerJson,If(IsBlank(varNextViewer),"null",varNextViewer) & If(Right(varViewerJson,1)=" ",""," "));
+
+AFTER
+-----
+    Set(varViewerJson,varNextViewer);
+
+CHANGE 48
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 651 after earlier edits; find the BEFORE block.
+WHY: Power Apps btnRunRequest.OnSelect: send one command carrying both final selection and local-viewer reset. Do not issue two different commands in adjacent Set() calls.
+
+BEFORE
+------
+payload:{ids:colSelected}},JSONFormat.FlattenValueTables));
+
+AFTER
+-----
+payload:{ids:colSelected,closeViewer:true}},JSONFormat.FlattenValueTables));
+
+CHANGE 49
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 633 after earlier edits; find the BEFORE block.
+WHY: Keep app-selected IDs aligned with the revised PCF eligibility rule.
+
+BEFORE
+------
+    ClearCollect(colSelected,Filter(colNextSelected As i,i.Value in colSources.id));
+
+AFTER
+-----
+    ClearCollect(colSelected,Filter(colNextSelected As i,i.Value in Filter(colSources,!flagged).id));
+
+CHANGE 50
+========================================================================
+FILE: PowerApps_PCF_End_to_End_Implementation.txt
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\PowerApps_PCF_End_to_End_Implementation.txt
+LOCATION: around line 645 after earlier edits; find the BEFORE block.
+WHY: Normalize an empty home workspace key to text.
+
+BEFORE
+------
+    Set(varWorkspaceId,Text(varResponse.state.workspaceId));
+
+AFTER
+-----
+    Set(varWorkspaceId,Coalesce(Text(varResponse.state.workspaceId),""));
+
+CHANGE 51
+========================================================================
+FILE: ShelfDomainAgent/tools/make_solution.py
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\tools\make_solution.py
+LOCATION: around line 67 after earlier edits; find the BEFORE block.
+WHY: Validate the generated project deletion target stays immediately under solution-build before deleting an old generated project.
+
+BEFORE
+------
+    proj = out_dir / name
+    if proj.exists():
+        shutil.rmtree(proj)
+
+AFTER
+-----
+    if name not in ALL_CONTROLS:
+        fail(f"Unknown control: {name}")
+    base = out_dir.resolve()
+    proj = (base / name).resolve()
+    if proj.parent != base or proj == base:
+        fail(f"Unsafe generated-project path: {proj}")
+    if proj.exists():
+        shutil.rmtree(proj)
+
+CHANGE 52
+========================================================================
+FILE: ShelfDomainAgent/tools/make_solution.py
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\tools\make_solution.py
+LOCATION: around line 81 after earlier edits; find the BEFORE block.
+WHY: The current tree has active manifests for all controls; copied sibling panels must not accidentally become extra active entry points in the generated project.
+
+BEFORE
+------
+    # active manifest for this control only (the repo keeps its .off files untouched)
+
+AFTER
+-----
+    # Dependency panels are TypeScript imports, not additional PCF entry points.
+    # Their original files remain untouched; rename only these generated copies.
+    for dependency in folders:
+        if dependency in ("shared", name):
+            continue
+        dependency_manifest = proj / dependency / "ControlManifest.Input.xml"
+        if dependency_manifest.exists():
+            dependency_manifest.replace(dependency_manifest.with_suffix(".xml.off"))
+
+    # active manifest for this control only (the repo keeps its .off files untouched)
+
+CHANGE 53
+========================================================================
+FILE: ShelfDomainAgent/tools/make_solution.py
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\tools\make_solution.py
+LOCATION: around line 131 after earlier edits; find the BEFORE block.
+WHY: Validate --controls before constructing source/generated paths.
+
+BEFORE
+------
+    for c in controls:
+        if not (ROOT / c).is_dir():
+
+AFTER
+-----
+    for c in controls:
+        if c not in ALL_CONTROLS:
+            fail(f"Unknown control: {c}")
+        if not (ROOT / c).is_dir():
+
+CHANGE 54
+========================================================================
+FILE: ShelfDomainAgent/ShelfWorkspace/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfWorkspace\ControlManifest.Input.xml
+LOCATION: around line 5 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 55
+========================================================================
+FILE: ShelfDomainAgent/ShelfChat/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfChat\ControlManifest.Input.xml
+LOCATION: around line 5 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 56
+========================================================================
+FILE: ShelfDomainAgent/ShelfSources/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfSources\ControlManifest.Input.xml
+LOCATION: around line 5 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 57
+========================================================================
+FILE: ShelfDomainAgent/ShelfStudio/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfStudio\ControlManifest.Input.xml
+LOCATION: around line 5 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 58
+========================================================================
+FILE: ShelfDomainAgent/ShelfHome/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfHome\ControlManifest.Input.xml
+LOCATION: around line 5 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 59
+========================================================================
+FILE: ShelfDomainAgent/ShelfAdmin/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfAdmin\ControlManifest.Input.xml
+LOCATION: around line 3 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 60
+========================================================================
+FILE: ShelfDomainAgent/ShelfToast/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfToast\ControlManifest.Input.xml
+LOCATION: around line 3 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 61
+========================================================================
+FILE: ShelfDomainAgent/ShelfBanner/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfBanner\ControlManifest.Input.xml
+LOCATION: around line 3 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+CHANGE 62
+========================================================================
+FILE: ShelfDomainAgent/ShelfObservability/ControlManifest.Input.xml
+FULL PATH: C:\Users\kumarga8\OneDrive - MATTEL INC\Documents\DomainAgent\ShelfDomainAgent\ShelfObservability\ControlManifest.Input.xml
+LOCATION: around line 3 after earlier edits; find the BEFORE block.
+WHY: Bump the component version for import/upgrade. If a higher version already exists in your tenant, choose a higher version than that instead.
+
+BEFORE
+------
+version="1.1.0"
+
+AFTER
+-----
+version="1.1.1"
+
+ADDITION - NEW RESPONSE SCHEMA REFERENCE FILE
+=============================================
+PROPOSED FILE: ShelfDomainAgent/contracts/FlowResponse.schema.json
+BEFORE: file does not exist.
+WHERE TO ADD: create contracts/ under ShelfDomainAgent, then the JSON file below.
+Paste the same JSON into both flows' Validate_Response Parse JSON actions (F1).
+AFTER - COMPLETE FILE:
+
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "requestId",
+        "ok",
+        "message",
+        "error",
+        "validation",
+        "state"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        },
+        "validation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "clientIndex",
+              "name",
+              "status",
+              "sourceId",
+              "reason"
+            ],
+            "properties": {
+              "clientIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "failed"
+                ]
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "state": {
+          "type": "object",
+          "required": [
+            "view",
+            "workspaceId",
+            "conversationId",
+            "sourceLimit",
+            "maxInlineFileBytes",
+            "notebooks",
+            "notebook",
+            "guardrail",
+            "settings",
+            "suggested",
+            "sources",
+            "selectedSourceIds",
+            "messages",
+            "outputs",
+            "viewerJson"
+          ],
+          "properties": {
+            "view": {
+              "type": "string",
+              "enum": [
+                "home",
+                "workspace"
+              ]
+            },
+            "workspaceId": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "sourceLimit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxInlineFileBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1572864
+            },
+            "notebooks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "createdOn",
+                  "sourceCount"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "createdOn": {
+                    "type": "string"
+                  },
+                  "sourceCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "notebook": {
+              "type": "object",
+              "required": [
+                "title",
+                "emoji",
+                "summary",
+                "topics"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "topics": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "guardrail": {
+              "type": "object",
+              "required": [
+                "active",
+                "domain",
+                "blockedToday",
+                "rules"
+              ],
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "domain": {
+                  "type": "string"
+                },
+                "blockedToday": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "settings": {
+              "type": "object",
+              "required": [
+                "title",
+                "emoji",
+                "answerStyle",
+                "citationMode",
+                "passMark",
+                "strictSources"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "answerStyle": {
+                  "type": "string",
+                  "enum": [
+                    "concise",
+                    "balanced",
+                    "detailed"
+                  ]
+                },
+                "citationMode": {
+                  "type": "string",
+                  "enum": [
+                    "always",
+                    "when-available"
+                  ]
+                },
+                "passMark": {
+                  "type": "string"
+                },
+                "strictSources": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "suggested": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "text"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title",
+                  "meta",
+                  "group",
+                  "isBuiltIn",
+                  "flagged",
+                  "kind",
+                  "fileName",
+                  "summary",
+                  "url",
+                  "downloadUrl",
+                  "pages"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "meta": {
+                    "type": "string"
+                  },
+                  "group": {
+                    "type": "string",
+                    "enum": [
+                      "retail",
+                      "cpg",
+                      "mine"
+                    ]
+                  },
+                  "isBuiltIn": {
+                    "type": "boolean"
+                  },
+                  "flagged": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "file",
+                      "link"
+                    ]
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "downloadUrl": {
+                    "type": "string"
+                  },
+                  "pages": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "selectedSourceIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "messages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "role",
+                  "text",
+                  "status",
+                  "createdOn",
+                  "citations",
+                  "followUps"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "assistant"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "blocked",
+                      "low"
+                    ]
+                  },
+                  "createdOn": {
+                    "type": "string"
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "index",
+                        "sourceId",
+                        "fileName",
+                        "sourceTitle",
+                        "snippet",
+                        "summary",
+                        "url",
+                        "page"
+                      ],
+                      "properties": {
+                        "index": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "sourceId": {
+                          "type": "string"
+                        },
+                        "fileName": {
+                          "type": "string"
+                        },
+                        "sourceTitle": {
+                          "type": "string"
+                        },
+                        "snippet": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  },
+                  "followUps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "name",
+                  "meta",
+                  "status",
+                  "createdOn"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "slides",
+                      "quiz",
+                      "guide",
+                      "brief",
+                      "path"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "meta": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "complete",
+                      "failed"
+                    ]
+                  },
+                  "createdOn": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "viewerJson": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "requestId",
+        "ok",
+        "message",
+        "error",
+        "validation",
+        "state"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean",
+          "enum": [
+            false
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        },
+        "validation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "clientIndex",
+              "name",
+              "status",
+              "sourceId",
+              "reason"
+            ],
+            "properties": {
+              "clientIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "failed"
+                ]
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "state": {
+          "type": "null"
+        }
+      }
+    }
+  ]
+}
+
+
+FLOW AND DATAVERSE CHANGES - REQUIRED MATCHING WORK
+=================================================
+There are no flow exports in this project. The BEFORE descriptions below refer
+to the earlier implementation guide, not a deployed flow we have inspected.
+Keep exactly two Power Apps-triggered flows; add Switch branches within them.
+
+F1. COMPLETE THE FLOW RESPONSE CONTRACT VALIDATION
+LOCATION: both flows, immediately before Compose_Response / Respond to PowerApp.
+BEFORE: a Compose object is serialized and returned without a structural gate.
+AFTER: add Parse JSON named Validate_Response, using the full success/error schema
+defined below. Content = outputs('Compose_Response'). Respond with:
+    string(body('Validate_Response'))
+On validation failure use Catch to return ok:false with the current requestId;
+never return a partial state with ok:true. Validate input branches too, using the
+three source schemas and agent-reply schema from the earlier guide.
+
+The response schema validates structure; add Conditions for cross-record rules:
+  - Source/message/output IDs are unique and refer to actual records.
+  - selectedSourceIds is a subset of nonflagged sources authorized to the caller.
+  - Citation source IDs belong to the selected set; filename fallback is unique.
+  - Citation indices are positive, unique within a message, and match the answer.
+  - Workspace id is nonempty for state.view=workspace and empty for home.
+  - viewerJson is blank or parses into a COMPLETE ViewerPayload, never a bare array.
+  - SourceLimit is positive; maxInlineFileBytes is within configured policy.
+  - Order messages by rcpg_sequence, not createdon or arbitrary API return order.
+
+For viewerJson add a Switch on json(viewerJson).type and a validation condition:
+  doc: data.id/title/group/kind must match a source the caller can access.
+  slides: data.id/title and nonempty slides array; every slide has title and string[] bullets.
+  quiz: data.id/title, 1..maxQuizQuestions questions, passMark 0..100; unique question
+        ids; nonempty prompt; >=2 string options; integer answerIndex in range.
+  text: data.id/title and sections array; each section has a string body.
+  path: data.id/title/role/level and modules array; positive unique n; string title;
+        sourceTitles string[]; done boolean. Load module state from rcpg_pathmodule.
+Reject unknown viewer types. The small parseJson change is not a substitute for
+this server validation. Catch malformed responses rather than normalizing them
+silently to empty successful content.
+
+F2. VALIDATE SOURCE CONTENT BEFORE MAKING IT USABLE
+LOCATION: FLOW_VALIDATE > AddLinkRequested / AddTextRequested / AddFileRequested.
+BEFORE: the guide leaves extractor/classifier/link infrastructure to configure.
+AFTER: configure it explicitly before enabling file types in the UI:
+  1. Recheck workspace authorization and remaining slots on the server.
+  2. Enforce <=1.5 MiB/file, <=3 MiB total decoded bytes/request, <=50000 pasted
+     text characters, supported extensions and matching content signatures.
+     Match appsetting if it imposes LOWER limits. Client checks can be bypassed.
+  3. Decode raw base64 with base64ToBinary, extract text for the real format.
+     TXT/MD/CSV: decode the supported encoding. PDF/DOCX: configure an extractor;
+     scanned documents require OCR. Reject unreadable/encrypted/unsupported data.
+  4. URL: resolve/fetch with an approved service, validate redirects, destination
+     restrictions, authentication, size, MIME/content; extract readable text.
+  5. Classify against the configured domain and validation policy. Treat source
+     text as data; do not let instructions inside it override validation.
+  6. Save rcpg_file and source metadata only as part of an accepted source.
+     Store pasted text as a UTF-8 .txt, kind=file. Preserve all original content.
+  7. Persist extracted text or an access-controlled retrieval reference. The
+     workbook has no extracted-text or indexing-status field. Two valid options:
+       A. Keep the existing schema and re-extract on chat requests within the
+          time budget; explicitly implement extraction in FLOW_CHAT too.
+       B. Recommended for repeated chat: ADD rcpg_source.rcpg_contenttext,
+          Multiple Lines of Text, with a configured max length. Save bounded
+          extracted text there; reject oversize input or use chunk storage and
+          retrieval infrastructure instead of silently truncating it.
+     rcpg_contenttext is a NEW proposed column, not present in the workbook.
+     Never store a full document in rcpg_summary just to avoid defining storage.
+  8. Publish an authenticated URL the browser can actually open. If unavailable,
+     return empty url/downloadUrl; the PCF disables download and shows summary.
+  9. Return accepted/rejected/failed per item and a complete usable-source snapshot.
+     Do not insert rejected items as selectable knowledge. Clean up temporary rows
+     on failed uploads. Only after extraction/validation succeeds is a row usable.
+
+Persisting a file to Dataverse is NOT equivalent to adding it to Copilot knowledge.
+FLOW_CHAT must fetch authorized selected content (or an agent retrieval tool must
+apply the workspace/source filter). A list of GUIDs in a prompt is insufficient.
+
+F3. PREVENT OLD CONVERSATION CONTENT FROM BYPASSING SOURCE SELECTION
+LOCATION: FLOW_CHAT > AskQuestion > before Execute_Agent_and_wait.
+BEFORE: reuse request.conversationId without a persisted source-set comparison.
+AFTER: use the server's saved conversation id and compare its source context.
+For a simple version with no new schema, start a fresh agent conversation on EVERY
+question and supply only the current selected passages plus sanitized permitted
+context. This sacrifices Copilot-side conversational memory, but avoids claiming
+source isolation while old source text remains in that memory.
+For conversation reuse, ADD these proposed fields on rcpg_workspace:
+  rcpg_conversationid       Text (current agent session)
+  rcpg_conversationsources  Multiple Lines of Text (canonical selected-id JSON)
+Canonicalize by sorting and de-duplicating the selected source GUIDs. Also reset
+conversation when a source's content changes, the caller changes in a shared
+workspace, or relevant access/strict-source policy changes. For shared workspaces,
+use per-user conversation records instead of these workspace-wide columns.
+
+Before execute: server context differs -> Conversation ID blank.
+After execute: persist returned conversationId and the validated context. Keep
+writing rcpg_chatmessage.rcpg_conversationid for historical message auditing.
+Never use a caller-supplied conversation id without verifying its association.
+Flow outputs state.conversationId from the saved current session.
+Both alternatives require explicit grounding enforcement; a prompt instruction
+alone cannot constrain an agent that is allowed to search unrelated knowledge.
+
+F4. PERSIST WORKSPACE SETTINGS IF YOU WANT THEM TO SURVIVE REOPEN
+LOCATION: Dataverse > rcpg_workspace; FLOW_CHAT > WorkspaceSettingsSaved/open/load.
+BEFORE: answerStyle/citationMode/strictSources are session-only in the guide.
+AFTER (recommended schema addition): add rcpg_settingsjson, Multiple Lines of Text.
+On WorkspaceSettingsSaved validate the payload (it is NOT {values:...}), update
+rcpg_name/rcpg_emoji and serialize allowed settings only into rcpg_settingsjson:
+  {"answerStyle":"balanced","citationMode":"always","strictSources":true}
+On load parse saved settings and merge validated defaults for missing properties.
+Set settings.title/emoji from workspace columns; set passMark from server policy.
+Do not save arbitrary client keys or client-supplied role/limit values as settings.
+If you retain session-only behavior, no schema addition is necessary; clearly tell
+users those three preferences reset when a workspace is reopened.
+
+F5. SAVE AND GRADE THE NEW QUIZ COMPLETION PAYLOAD
+LOCATION: FLOW_CHAT > QuizCompleted (replace the baseline summary-only handling).
+BEFORE: trust reported total/correct, recompute score, ignore per-question answers.
+AFTER: Parse completion JSON with required attemptId,quizId,answers,durationSeconds.
+answers is [{questionId:string,selectedIndex:integer,answeredAt:ISO string}].
+The PCF still sends summary fields for UI compatibility; do not trust them for grading.
+Load the persisted quiz by quizId, verify access/workspace, then:
+  - Each saved question id must occur exactly once in answers; reject extras.
+  - Every selectedIndex is within that question's saved options array.
+  - correct = count where selectedIndex equals the saved answerIndex.
+  - total = saved question count; score = round(100 * correct / total).
+  - passMark = saved quiz passMark; passed = score >= passMark.
+  - Bound/check durationSeconds; do not treat a client clock as authoritative.
+Create rcpg_quizattempt with the workbook's columns and authenticated systemuser.
+Use attemptId as the primary key ONLY if it is a valid GUID and your Dataverse
+create action/API allows setting rcpg_quizattemptid. Otherwise add a NEW Text column
+rcpg_clientattemptid plus an active alternate key and use that for idempotency.
+A conflicting attempt id belonging to another user/quiz must be denied, not reused.
+If already saved for the same user/quiz, return the existing result, not a new row.
+If rcpg_quizanswer is enabled, create detail rows linked to that saved attempt,
+using server-computed correctness. Add a unique key on attempt + question id if
+you need safe repeated writes; continue/repair incomplete child writes on retry.
+Return the saved quiz viewer. Reopening a quiz starts a new attempt, by design.
+This learning UI exposes correct answers in the client; it is not a secure exam.
+
+F6. RETRY, CONCURRENCY, AND RESPONSE DEADLINES
+LOCATION: both flow triggers and every mutation branch.
+BEFORE: requestId is only echoed; app has no automatic retry and reloads after timeout.
+AFTER: keep no-automatic-retry for the baseline. Disable long retries on agent/
+OCR actions and test total response time below the documented synchronous window.
+Serialize conflicting workspace writes for the initial small installation. Separate
+flow concurrency=1 settings do NOT serialize one flow against the other; source
+limit check + create needs a shared server lock/transaction if different users can
+write the same workspace concurrently. Do not use Max(sequence)+1 concurrently.
+
+For automatic retries, add a request ledger with a unique requestId and atomic
+claim, saved owner/workspace/operation/status/result, and safe resume semantics.
+A read-then-create without a unique key is not a lock. Reuse the ORIGINAL requestId
+for a retry; the guide currently generates a new id for each explicit user request.
+Adding a ledger alone cannot undo an external agent call that already completed.
+If the real workload needs >120-second responses, add submit/status operations
+and persistent job state to the SAME two flow connections, plus an app polling
+timer. That is a separate asynchronous contract; do not simply increase .Run wait
+or claim the synchronous formulas support arbitrarily long OCR/generation.
+
+F7. AUTHORIZE DATA AND MAP CHOICES ON THE SERVER
+LOCATION: both flows, before any get/list/create/update/delete or agent invocation.
+BEFORE: workbook supplies logical names, not deployed Choice integers or identities.
+AFTER: use authenticated connection/context; resolve actual systemuser; enforce
+Dataverse rights plus Active rcpg_workspacerole grants/rcpg_role capabilities.
+Resolve Choice integers from the actual environment and map them to exact strings:
+  source group retail/cpg/mine; kind file/link;
+  chat role user/assistant; status ok/blocked/low (historical error -> low for UI).
+Validate lookup ownership and foreign keys on every operation, including citations,
+outputs, quiz ids, source removal and alternate-key replay. User().Email in a request
+is not authorization evidence. Use the maker's real table display names in action
+selectors and logical names for filters. Do not invent entity-set plural names.
+
+F8. SNAPSHOT FORMULA REVIEW
+LOCATION: Canvas scrMain > btnRunRequest.OnSelect, from section 7 of the first guide.
+Apply the explicit BEFORE/AFTER changes above. Retain its stage-by-stage IfError
+structure and only commit when varRequestParsed is true. Both flows must return
+all required fields and arrays, so missing fields fail before changing the UI.
+The commit uses typed local collections and JSONFormat.FlattenValueTables. Keep
+JSON() in behavior formulas. The new closeViewer command removes the old need to
+alternate whitespace in ViewerJson. Delete the old explanatory whitespace paragraph.
+Also update guide prose to reflect: canonical CreatePathRequested, new quiz answers,
+new WorkspaceKey/HostBusy inputs, no QuizAnswered event, and selected settings option.
+The preceding numbered edits intentionally target executable formula/code fragments;
+this paragraph lists the accompanying documentation corrections.
+
+F9. INPUT VALIDATION AND BUSY RECOVERY
+LOCATION: Canvas homePCF.OnChange and workspacePCF.OnChange.
+BEFORE: ParseJSON assumes the project's own event payload is valid JSON.
+AFTER: keep that assumption for this controlled PCF; never bind third-party input
+directly to those event channels. If adding external event sources, wrap event
+parsing in IfError and Notify before setting varBusy or scheduling the dispatcher.
+On any flow failure the existing handler clears busy/thinking/tool state and
+restores a failed chat draft via SetDraft; keep that behavior with the revised
+sendPending guard. Test it in Canvas after reconnecting both flow signatures.
+
+BUILD / IMPORT LOCATIONS AND COMMANDS
+====================================
+Do not edit generated/ManifestTypes.d.ts manually. Regenerate after manifest edits.
+The copied generated files currently contain a broad combined interface; compile
+from newly generated per-control projects to confirm the actual manifest inputs.
+
+From WORKSPACE ROOT\ShelfDomainAgent, after applying the code changes:
+  python tools/make_solution.py --controls ShelfHome ShelfWorkspace --no-pac
+
+This creates:
+  ShelfDomainAgent/solution-build/ShelfHome/
+  ShelfDomainAgent/solution-build/ShelfWorkspace/
+Workspace imports the shared Sources/Chat/Studio panels from its generated copy;
+only Home and Workspace need to be deployed for this particular Canvas recipe.
+If standalone controls are actually used elsewhere, include those controls in the
+--controls list and rebuild/test them too. The core code examples target Workspace.
+
+In EACH generated project directory, with Node/npm installed:
+  npm ci
+  npm run refreshTypes
+  npm run build -- --buildMode production
+
+Generate/register the solution project using the existing helper (without --no-pac):
+  python tools/make_solution.py --controls ShelfHome ShelfWorkspace
+NOTE: that command regenerates the per-control folders. Run npm ci/build in those
+fresh folders again if your MSBuild setup does not restore/build npm dependencies.
+Use the installed Power Platform CLI + Visual Studio Build Tools workflow:
+  cd solution/ShelfMind
+  msbuild /t:build /restore /p:Configuration=Release
+
+Review the resulting solution ZIP under solution/ShelfMind/bin/Release, then import
+it through Power Apps Solutions. In the Canvas editor update the code components,
+refresh/re-add both flows after any trigger/response schema changes, and confirm:
+  workspacePCF.WorkspaceKey = If(varView="workspace",varWorkspaceId,"home")
+  workspacePCF.HostBusy = varBusy
+  workspacePCF.Command = varCommandJson
+  both .Run calls still accept one text and return resultjson text.
+If a higher manifest version is already deployed, bump beyond that version.
+Root pcfconfig.json may remain Admin-focused: do not mistake npm run build there
+for a build of both required controls. Build the isolated projects above.
+
+VERIFICATION REQUIRED BEFORE PUBLISHING
+======================================
+1. Build both required controls; Canvas App Checker must pass the revised formulas.
+2. Cold start: initialization runs once after App.OnStart; failed init can Reload.
+3. Open workspace A, type a draft, switch to B: no A draft/viewer/selection survives.
+4. Narrow layout: changing chat/source tabs preserves draft and unfinished quiz;
+   microphone stops while hidden; returning does not reapply an old draft command.
+5. No selected sources: Enter, Send and follow-up do not clear/submit a question.
+6. Double-click Send: one foreground AskQuestion. Failed flow restores draft and
+   permits another send. Two sequential host updateView calls do not lose commands.
+7. Two sources with identical names: citation sourceId wins; missing sourceId is
+   unresolved unless exactly one filename match exists. Only one event is emitted.
+8. Upload zero-byte, oversize, unsupported, unreadable, >3 MiB batch, or too many
+   files: no invalid AddFileRequested is emitted. Cancel/unmount during a read
+   cannot later attach files to a different workspace. Server repeats all checks.
+9. Open quiz A then quiz B with the same question ids: B starts fresh. Complete B:
+   exactly one QuizCompleted includes all answers and a stable attemptId. Server
+   grades saved answers, saves one attempt and optional detail rows, handles replay.
+10. Change selected content and ask again: previous source knowledge cannot leak
+    through a reused Copilot conversation or unrestricted agent retrieval.
+11. Malformed response/viewer payload, source-policy denial and connector timeout:
+    show an error, preserve committed state, unlock the UI, and allow Reload.
+12. Open/download files with a second authorized user, and deny another user's
+    workspace/source/quiz/conversation ids sent directly to either flow.
+
+REMAINING ENVIRONMENT-DEPENDENT SETUP
+===================================
+You still need the actual published Copilot agent, deployed Choice metadata,
+extraction/OCR service, source-grounding/retrieval configuration, authenticated
+file links, flow connections and security roles. No local source edit can supply
+those tenant values. The app has two flow-name replacements only after both flows
+implement the contracts and chosen persistence options above.
+
+VALIDATION OF THIS CHANGE DOCUMENT
+=================================
+Every local BEFORE block was matched exactly and replacements applied in memory
+in order; proposed XML manifests were parsed successfully. Original files were
+not overwritten. Node/npm and dependencies were not available on the shell PATH
+for a PCF build, and no Canvas/Dataverse tenant session was available. These are
+reviewable code changes, not a claim of compiled/deployed end-to-end behavior.
+
+REFERENCES
+==========
+PCF lifecycle and output notifications:
+https://learn.microsoft.com/en-us/power-apps/developer/component-framework/reference/control/updateview
+Code components in Canvas / version updates:
+https://learn.microsoft.com/en-us/power-apps/developer/component-framework/component-framework-for-canvas-apps
+Build and solution workflow:
+https://learn.microsoft.com/en-us/power-apps/developer/component-framework/create-custom-controls-using-pcf
+Flow limits, including synchronous responses:
+https://learn.microsoft.com/en-us/power-automate/limits-and-config
+
+END OF CHANGE GUIDE
