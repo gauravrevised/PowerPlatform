@@ -1,0 +1,10 @@
+nfTx     = If(gblTheme = "dark", ColorValue("#f0f0f5"), ColorValue("#111118"));
+nfMut    = If(gblTheme = "dark", ColorValue("#a0a0b8"), ColorValue("#3c3c4a"));
+nfFaint  = If(gblTheme = "dark", ColorValue("#6e6e88"), ColorValue("#6e6e80"));
+nfPanel  = If(gblTheme = "dark", ColorValue("#111115"), ColorValue("#ffffff"));
+nfSunk   = If(gblTheme = "dark", ColorValue("#18181d"), ColorValue("#f0f0f5"));
+nfLine   = If(gblTheme = "dark", ColorValue("#2a2a35"), ColorValue("#e0e0e8"));
+nfHair   = If(gblTheme = "dark", ColorValue("#1f1f28"), ColorValue("#ebebf0"));
+nfHov    = If(gblTheme = "dark", ColorValue("#1a1a24"), ColorValue("#f0effe"));
+nfAcc    = If(gblTheme = "dark", ColorValue("#7c6dfa"), ColorValue("#5b4efa"));
+nfBad    = If(gblTheme = "dark", ColorValue("#f87171"), ColorValue("#dc2626"));
